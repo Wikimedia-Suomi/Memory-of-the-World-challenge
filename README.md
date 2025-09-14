@@ -19,7 +19,8 @@ pip install -r requirements.txt
 retrieve usernames listed on the challenge participants page.  By
 default it prints the usernames, but an output file can be specified.
 The `--wikis` option queries each user's global account to display the
-wikis they have edited.
+Wikipedia projects where they have at least one edit. Other Wikimedia
+projects are ignored.
 
 ```
 python load_participants.py

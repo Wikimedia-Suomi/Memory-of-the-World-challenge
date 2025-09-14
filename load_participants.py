@@ -48,7 +48,7 @@ def write_output(lines: Iterable[str], output: Path | None) -> None:
 def fetch_user_wikis(
     site: pywikibot.Site, usernames: Iterable[str]
 ) -> Dict[str, List[str]]:
-    """Return a mapping of username to wiki codes they have edited."""
+    """Return a mapping of username to Wikipedia projects they have edited."""
     result: Dict[str, List[str]] = {}
     for name in usernames:
         request = site._simple_request(
@@ -58,7 +58,11 @@ def fetch_user_wikis(
             guiprop="merged",
         )
         data = request.submit()
-        wikis = [m["wiki"] for m in data["query"]["globaluserinfo"].get("merged", [])]
+        wikis = [
+            m["wiki"]
+            for m in data["query"]["globaluserinfo"].get("merged", [])
+            if m.get("editcount", 0) > 0 and "wikipedia.org" in m.get("url", "")
+        ]
         result[name] = wikis
     return result
 
@@ -83,7 +87,7 @@ def main() -> int:
     parser.add_argument(
         "--wikis",
         action="store_true",
-        help="also fetch the wikis each user has edited",
+        help="also fetch the Wikipedia projects each user has edited",
     )
     args = parser.parse_args()
 
