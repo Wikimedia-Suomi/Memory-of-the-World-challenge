@@ -74,13 +74,16 @@ class Command(BaseCommand):
 
                     page_obj = pywikibot.Page(site, contrib["title"])
                     revid = contrib["revid"]
+                    prefix = activity.wiki.replace("wiki", "")
+                    link = f"[[:{prefix}:{page_obj.title()}]]"
+                    rev_link = f"[[:{prefix}:Special:Diff/{revid}|{revid}]]"
                     revision = page_obj.get_revision(revid, content=True)
                     if SKIP_TAGS & set(revision.tags):
 
                         self.stdout.write(
                             f"SKIPPED:{revision.tags} : "
                             f"{participant.username} on {activity.wiki} added UNESCO link in "
-                            f"[[{page_obj.title()}]] (rev {revid})"
+                            f"{link} (rev {rev_link})"
                         )
                         continue
 
@@ -98,8 +101,6 @@ class Command(BaseCommand):
 
                         creator = get_creator(page_obj)
                         points = 2
-                        prefix = activity.wiki.replace("wiki", "")
-                        link = f"[[:{prefix}:{page_obj.title()}]]"
                         action_desc = f"added UNESCO link in {link}"
                         if creator == participant.username:
                             points = 5
@@ -118,7 +119,7 @@ class Command(BaseCommand):
                                 pass
 
                         actions_by_user[participant.username].append(
-                            f"* +{points} points, on {activity.wiki} {action_desc} (rev {revid})"
+                            f"* +{points} points, on {activity.wiki} {action_desc} (rev {rev_link})"
                         )
                         points_by_user[participant.username] += points
 
