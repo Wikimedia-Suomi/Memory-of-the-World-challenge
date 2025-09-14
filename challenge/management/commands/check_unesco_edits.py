@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime, timezone
+from collections import defaultdict
 
 import pywikibot
 from django.core.management.base import BaseCommand
@@ -52,13 +53,18 @@ class Command(BaseCommand):
 
 
         participants = Participant.objects.all()
+        points_by_user: defaultdict[str, int] = defaultdict(int)
+        pages_seen: defaultdict[str, set[tuple[str, str]]] = defaultdict(set)
+
         for participant in participants:
             activities = participant.activities.filter(active=True)
             for activity in activities:
                 site = pywikibot.site.APISite.fromDBName(activity.wiki)
                 ucgen = site.usercontribs(user=participant.username, end=since_ts)
                 for contrib in ucgen:
-                    timestamp = datetime.fromisoformat(contrib['timestamp'].replace("Z", "+00:00"))
+                    timestamp = datetime.fromisoformat(
+                        contrib["timestamp"].replace("Z", "+00:00")
+                    )
                     if timestamp.tzinfo is None:
                         timestamp = timestamp.replace(tzinfo=timezone.utc)
 
@@ -84,9 +90,33 @@ class Command(BaseCommand):
                     if UNESCO_PATTERN.search(new_text) and not UNESCO_PATTERN.search(
                         old_text
                     ):
+                        page_key = (activity.wiki, page_obj.title())
+                        if page_key in pages_seen[participant.username]:
+                            continue
+                        pages_seen[participant.username].add(page_key)
+
                         creator = get_creator(page_obj)
+                        points = 2
+                        if creator == participant.username:
+                            points = 5
+                            try:
+                                item = pywikibot.ItemPage.fromPage(page_obj)
+                                item.get()
+                                if any(
+                                    claim.getTarget().id == "Q13406463"
+                                    for claim in item.claims.get("P31", [])
+                                ):
+                                    points = 25
+                            except Exception:
+                                pass
+
+                        points_by_user[participant.username] += points
                         self.stdout.write(
                             f"{participant.username} on {activity.wiki} added UNESCO link in "
-                            f"[[{page_obj.title()}]] (rev {revid}) {creator}"
+                            f"[[{page_obj.title()}]] (rev {revid}) {creator} +{points} points"
                         )
 
+        if points_by_user:
+            self.stdout.write("\nPoints per user:")
+            for user, pts in points_by_user.items():
+                self.stdout.write(f"{user}: {pts} points")
