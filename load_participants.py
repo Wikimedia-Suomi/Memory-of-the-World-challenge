@@ -99,25 +99,32 @@ def fetch_unesco_pages(wikis: Iterable[str]) -> Dict[str, List[str]]:
     *wikis* should be an iterable of database names such as ``"enwiki"``.
     For each wiki the function queries ``exturlusage`` and collects titles
     of pages that contain links whose URL includes ``memory-world`` either
-    directly or with a language code such as ``/en/memory-world``.  The
-    returned mapping uses the wiki database name as the key and a sorted
-    list of page titles as the value.
+    directly or with a language code such as ``/en/memory-world``.  Pages
+    are only included if their most recent edit occurred within the last
+    33 days.  The returned mapping uses the wiki database name as the key
+    and a sorted list of page titles as the value.
     """
 
     # UNESCO publishes the Memory of the World site in these languages
     languages = ['', 'ar', 'en', 'es', 'fr', 'ru', 'zh']
 
+    cutoff = datetime.now(timezone.utc) - timedelta(days=33)
     result: Dict[str, List[str]] = {}
     for wiki in wikis:
-        print(wiki)
         wiki_site = pywikibot.site.APISite.fromDBName(wiki)
         pages: Set[str] = set()
         for lang in languages:
-            print(lang)
             suffix = f'/{lang}/memory-world' if lang else '/memory-world'
             query = f'www.unesco.org{suffix}'
             for page in wiki_site.exturlusage(query, protocol='https'):
-                pages.add(page.title())
+                # Only consider pages edited recently
+                latest = page.latest_revision.timestamp
+                timestamp = (
+                    latest.to_datetime() if hasattr(latest, "to_datetime") else latest
+                )
+                if timestamp >= cutoff:
+                    pages.add(page.title())
+
         result[wiki] = sorted(pages)
     return result
 
@@ -170,7 +177,7 @@ def main() -> int:
         wiki_map = fetch_user_wikis(site, usernames)
         lines = [f"{user}: {', '.join(wiki_map[user])}" for user in usernames]
         print(wiki_map)
-
+        
         if args.unesco:
             all_wikis = sorted({w for wikis in wiki_map.values() for w in wikis})
             unesco_map = fetch_unesco_pages(all_wikis)
