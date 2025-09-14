@@ -34,6 +34,7 @@ class Command(BaseCommand):
 
         since_ts = pywikibot.Timestamp.set_timestamp(since)
 
+
         participants = Participant.objects.all()
         for participant in participants:
             activities = participant.activities.filter(active=True)
@@ -42,8 +43,11 @@ class Command(BaseCommand):
                 ucgen = site.usercontribs(user=participant.username, end=since_ts)
                 ucgen.request["ucprop"] += "|tags"
                 for contrib in ucgen:
-                    ts = contrib["timestamp"].to_datetime().replace(tzinfo=timezone.utc)
-                    if ts < since:
+                    timestamp = datetime.fromisoformat(contrib['timestamp'].replace("Z", "+00:00"))
+                    if timestamp.tzinfo is None:
+                        timestamp = timestamp.replace(tzinfo=timezone.utc)
+
+                    if timestamp < since:
                         break
 
                     if SKIP_TAGS & set(contrib.get("tags", [])):
