@@ -51,7 +51,7 @@ class Command(BaseCommand):
 
                     page_obj = pywikibot.Page(site, contrib["title"])
                     revid = contrib["revid"]
-                    revision = next(page_obj.revisions(revids=[revid], content=True))
+                    revision = page_obj.get_revision(revid, content=True)
                     parentid = revision.parentid
                     new_text = revision.text or ""
                     old_text = page_obj.getOldVersion(parentid) if parentid else ""
