@@ -9,6 +9,7 @@ public pages but can be requested for private pages.
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, Iterable, List, Set
 
@@ -48,7 +49,15 @@ def write_output(lines: Iterable[str], output: Path | None) -> None:
 def fetch_user_wikis(
     site: pywikibot.Site, usernames: Iterable[str]
 ) -> Dict[str, List[str]]:
-    """Return a mapping of username to Wikipedia projects they have edited."""
+    """Return a mapping of username to recent Wikipedia projects.
+
+    Only wikis where the user has edited within the last 32 days are
+    included in the result.  The function queries the global user info
+    to discover wikis and then checks the most recent contribution on
+    each project before adding it to the user's list.
+    """
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=32)
     result: Dict[str, List[str]] = {}
     for name in usernames:
         request = site.simple_request(
@@ -58,11 +67,21 @@ def fetch_user_wikis(
             guiprop="merged",
         )
         data = request.submit()
-        wikis = [
-            m["wiki"]
-            for m in data["query"]["globaluserinfo"].get("merged", [])
-            if m.get("editcount", 0) > 0 and "wikipedia.org" in m.get("url", "")
-        ]
+        wikis: List[str] = []
+        for merged in data["query"]["globaluserinfo"].get("merged", []):
+            url = merged.get("url", "")
+            if merged.get("editcount", 0) == 0 or "wikipedia.org" not in url:
+                continue
+
+            lang = url.split("//")[-1].split(".")[0]
+            wiki_site = pywikibot.Site(lang, "wikipedia")
+            user = pywikibot.User(wiki_site, name)
+            last_edit = next(user.contributions(total=1), None)
+            if not last_edit:
+                continue
+            timestamp = last_edit[1].to_datetime() if hasattr(last_edit[1], "to_datetime") else last_edit[1]
+            if timestamp >= cutoff:
+                wikis.append(merged["wiki"])
         result[name] = wikis
     return result
 
@@ -87,7 +106,7 @@ def main() -> int:
     parser.add_argument(
         "--wikis",
         action="store_true",
-        help="also fetch the Wikipedia projects each user has edited",
+        help="also fetch Wikipedia projects each user edited in the last 32 days",
     )
     args = parser.parse_args()
 
