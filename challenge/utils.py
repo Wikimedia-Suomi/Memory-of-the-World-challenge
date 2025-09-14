@@ -136,6 +136,7 @@ def fetch_unesco_pages(wikis: Iterable[str]) -> Dict[str, List[str]]:
                 timestamp = (
                     latest.to_datetime() if hasattr(latest, "to_datetime") else latest
                 )
+                timestamp = timestamp.replace(tzinfo=timezone.utc)
                 if timestamp >= cutoff:
                     pages.add(page.title())
 
