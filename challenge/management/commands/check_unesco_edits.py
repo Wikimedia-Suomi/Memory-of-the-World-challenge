@@ -54,6 +54,7 @@ class Command(BaseCommand):
 
         participants = Participant.objects.all()
         points_by_user: defaultdict[str, int] = defaultdict(int)
+        actions_by_user: defaultdict[str, list[str]] = defaultdict(list)
         pages_seen: defaultdict[str, set[tuple[str, str]]] = defaultdict(set)
 
         for participant in participants:
@@ -97,8 +98,14 @@ class Command(BaseCommand):
 
                         creator = get_creator(page_obj)
                         points = 2
+                        prefix = activity.wiki.replace("wiki", "")
+                        link = f"[[:{prefix}:{page_obj.title()}]]"
+                        action_desc = f"added UNESCO link in {link}"
                         if creator == participant.username:
                             points = 5
+                            action_desc = (
+                                f"created article {link} with UNESCO link in it"
+                            )
                             try:
                                 item = pywikibot.ItemPage.fromPage(page_obj)
                                 item.get()
@@ -110,13 +117,16 @@ class Command(BaseCommand):
                             except Exception:
                                 pass
 
-                        points_by_user[participant.username] += points
-                        self.stdout.write(
-                            f"{participant.username} on {activity.wiki} added UNESCO link in "
-                            f"[[{page_obj.title()}]] (rev {revid}) {creator} +{points} points"
+                        actions_by_user[participant.username].append(
+                            f"* +{points} points, on {activity.wiki} {action_desc} (rev {revid})"
                         )
+                        points_by_user[participant.username] += points
 
         if points_by_user:
-            self.stdout.write("\nPoints per user:")
-            for user, pts in points_by_user.items():
-                self.stdout.write(f"{user}: {pts} points")
+            for user in sorted(points_by_user):
+                pts = points_by_user[user]
+                self.stdout.write(
+                    f"== [[USER:{user}|{user}]] (points: {pts}) =="
+                )
+                for line in actions_by_user[user]:
+                    self.stdout.write(line)
