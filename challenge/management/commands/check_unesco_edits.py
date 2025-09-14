@@ -20,6 +20,9 @@ SPARQL_QUERY = (
 )
 # No longer relying on edit comments for label counts
 
+metasite = pywikibot.Site("meta", "meta")
+metasite.login()
+
 def fetch_unesco_items() -> set[str]:
     """Fetch Wikidata items related to UNESCO Memory of the World."""
     endpoint = sparql.SparqlQuery()
@@ -72,8 +75,8 @@ class Command(BaseCommand):
         pages_seen: defaultdict[str, set[tuple[str, str]]] = defaultdict(set)
 
         for participant in participants:
-            if participant.username != "Umar2z":
-                continue
+#            if participant.username != "Umar2z":
+#                continue
             activities = participant.activities.filter(active=True)
             for activity in activities:
                 print(activity)
@@ -95,22 +98,23 @@ class Command(BaseCommand):
 
                     revid = contrib["revid"]
                     page_obj = pywikibot.Page(site, contrib["title"])
-                    revision = page_obj.get_revision(revid, content=True)
-                    if SKIP_TAGS & set(revision.tags):
-                        self.stdout.write(
-                            f"SKIPPED:{revision.tags} : "
-                            f"{participant.username} on {activity.wiki} added UNESCO link in "
-                            f"{link} (rev {rev_link})"
-                        )
-                        continue
 
                     if activity.wiki == "wikidatawiki":
                         title = contrib["title"]
                         comment = contrib.get("comment", "")
-                        print(title)
-                        print(comment)
+#                        print(title)
+#                        print(comment)
 
                         if title in items and ("wbsetlabel" in comment or "wbeditentity-update-languages" in comment):
+                            revision = page_obj.get_revision(revid, content=True)
+                            if SKIP_TAGS & set(revision.tags):
+                                self.stdout.write(
+                                    f"SKIPPED:{revision.tags} : "
+                                    f"{participant.username} on {activity.wiki} added UNESCO link in "
+                                    f"{link} (rev {rev_link})"
+                                )
+                                continue
+
                             parentid = revision.parentid
                             new_text = revision.text or "{}"
                             old_text = page_obj.getOldVersion(parentid) if parentid else "{}"
@@ -123,12 +127,22 @@ class Command(BaseCommand):
                             num_labels = len(added_languages)
                             if num_labels == 0:
                                 continue
-                            item_link = f"[[:d:{title}]]"
+                            item_link = "{{Q|" + title + "}}"
                             rev_link = f"[[:d:Special:Diff/{revid}|{revid}]]"
+                            lang_links = result = ", ".join([f"{{{{{added_lang}}}}}" for added_lang in added_languages])
                             actions_by_user[participant.username].append(
-                                f"* +{num_labels} points, on {activity.wiki} added label(s) of {item_link} (rev {rev_link})",
+                                f"* +{num_labels} points, on {activity.wiki} added label(s) ({lang_links}) to {item_link} (rev {rev_link})",
                             )
                             points_by_user[participant.username] += num_labels
+                        continue
+
+                    revision = page_obj.get_revision(revid, content=True)
+                    if SKIP_TAGS & set(revision.tags):
+                        self.stdout.write(
+                            f"SKIPPED:{revision.tags} : "
+                            f"{participant.username} on {activity.wiki} added UNESCO link in "
+                            f"{link} (rev {rev_link})"
+                        )
                         continue
 
                     prefix = activity.wiki.replace("wiki", "")
