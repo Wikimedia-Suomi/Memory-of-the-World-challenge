@@ -60,7 +60,7 @@ def fetch_user_wikis(
     each project before adding it to the user's list.
     """
 
-    cutoff = datetime.now(timezone.utc) - timedelta(days=32)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=33)
     result: Dict[str, List[str]] = {}
     for name in usernames:
         request = site.simple_request(
@@ -69,6 +69,8 @@ def fetch_user_wikis(
             guiuser=name,
             guiprop="merged",
         )
+        print(name)
+
         data = request.submit()
         wikis: List[str] = []
         for merged in data["query"]["globaluserinfo"].get("merged", []):
@@ -82,7 +84,8 @@ def fetch_user_wikis(
             last_edit = next(user.contributions(total=1), None)
             if not last_edit:
                 continue
-            timestamp = last_edit[1].to_datetime() if hasattr(last_edit[1], "to_datetime") else last_edit[1]
+            timestamp = last_edit[2].to_datetime() if hasattr(last_edit[2], "to_datetime") else last_edit[2]
+            timestamp = timestamp.replace(tzinfo=timezone.utc)
             if timestamp >= cutoff:
                 wikis.append(merged["wiki"])
         result[name] = wikis
@@ -121,6 +124,7 @@ def fetch_unesco_pages(wikis: Iterable[str]) -> Dict[str, List[str]]:
                 )
                 if timestamp >= cutoff:
                     pages.add(page.title())
+
         result[wiki] = sorted(pages)
     return result
 
@@ -168,10 +172,12 @@ def main() -> int:
             return 1
         raise
 
+    print(1)
     if args.wikis:
         wiki_map = fetch_user_wikis(site, usernames)
         lines = [f"{user}: {', '.join(wiki_map[user])}" for user in usernames]
-
+        print(wiki_map)
+        
         if args.unesco:
             all_wikis = sorted({w for wikis in wiki_map.values() for w in wikis})
             unesco_map = fetch_unesco_pages(all_wikis)
