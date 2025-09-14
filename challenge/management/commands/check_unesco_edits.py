@@ -17,8 +17,8 @@ SPARQL_QUERY = (
     "SELECT DISTINCT ?item WHERE { ?item p:P1435 ?s. ?s ps:P1435 wd:Q16024238."
     " ?s prov:wasDerivedFrom/pr:P854 ?refurl. ?s pq:P580 ?date. }"
 )
-LABEL_EDIT_RE = re.compile(r"/\\*wbsetlabel[^*]*:(\d+)\\|")
-
+#LABEL_EDIT_RE = re.compile(r"/\\*wbsetlabel[^*]*:(\d+)\\|")
+LABEL_EDIT_RE = re.compile(r"(?:wbsetlabel|wbeditentity-update-languages)")
 
 def fetch_unesco_items() -> set[str]:
     """Fetch Wikidata items related to UNESCO Memory of the World."""
@@ -72,9 +72,12 @@ class Command(BaseCommand):
         pages_seen: defaultdict[str, set[tuple[str, str]]] = defaultdict(set)
 
         for participant in participants:
+            if participant.username != "Umar2z":
+                continue
             activities = participant.activities.filter(active=True)
             for activity in activities:
-                site = pywikibot.site.APISite.fromDBName(activity.wiki)
+                print(activity)
+                site = pywikibot.site.APISite.fromDBName(activity.wiki)                
                 ucgen = site.usercontribs(
                     user=participant.username, start=end_ts, end=start_ts
                 )
@@ -91,34 +94,36 @@ class Command(BaseCommand):
                         continue
 
                     revid = contrib["revid"]
-
-                    if activity.wiki == "wikidatawiki":
-                        title = contrib["title"]
-                        comment = contrib.get("comment", "")
-                        if title in items and "wbsetlabel" in comment:
-                            match = LABEL_EDIT_RE.search(comment)
-                            num_labels = int(match.group(1)) if match else 1
-                            item_link = f"[[:d:{title}]]"
-                            rev_link = f"[[:d:Special:Diff/{revid}|{revid}]]"
-                            actions_by_user[participant.username].append(
-                                f"* +{num_labels} points, on {activity.wiki} edited label(s) of {item_link} (rev {rev_link})"
-                            )
-                            points_by_user[participant.username] += num_labels
-                        continue
-
                     page_obj = pywikibot.Page(site, contrib["title"])
-                    prefix = activity.wiki.replace("wiki", "")
-                    link = f"[[:{prefix}:{page_obj.title()}]]"
-                    rev_link = f"[[:{prefix}:Special:Diff/{revid}|{revid}]]"
                     revision = page_obj.get_revision(revid, content=True)
                     if SKIP_TAGS & set(revision.tags):
-
                         self.stdout.write(
                             f"SKIPPED:{revision.tags} : "
                             f"{participant.username} on {activity.wiki} added UNESCO link in "
                             f"{link} (rev {rev_link})"
                         )
                         continue
+
+                    if activity.wiki == "wikidatawiki":
+                        title = contrib["title"]
+                        comment = contrib.get("comment", "")
+                        print(title)
+                        print(comment)
+
+                        if title in items and ("wbsetlabel" in comment or "wbeditentity-update-languages" in comment):
+                            match = LABEL_EDIT_RE.search(comment)
+                            num_labels = 0 if match else 1
+                            item_link = f"[[:d:{title}]]"
+                            rev_link = f"[[:d:Special:Diff/{revid}|{revid}]]"
+                            actions_by_user[participant.username].append(
+                                f"* +1 points, on {activity.wiki} edited label(s) of {item_link} (rev {rev_link})"
+                            )
+                            points_by_user[participant.username] += num_labels
+                        continue
+
+                    prefix = activity.wiki.replace("wiki", "")
+                    link = f"[[:{prefix}:{page_obj.title()}]]"
+                    rev_link = f"[[:{prefix}:Special:Diff/{revid}|{revid}]]"
 
                     parentid = revision.parentid
                     new_text = revision.text or ""

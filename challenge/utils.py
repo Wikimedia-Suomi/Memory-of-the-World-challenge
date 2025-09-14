@@ -74,7 +74,7 @@ def fetch_user_wikis(
         for merged in data["query"]["globaluserinfo"].get("merged", []):
             url = merged.get("url", "")
             editcount = merged.get("editcount", 0)
-            if editcount == 0 or "wikipedia.org" not in url:
+            if editcount == 0 or ("wikipedia.org" not in url and "wikidata.org" not in url):
                 continue
 
             wiki_db = merged["wiki"]
@@ -84,7 +84,8 @@ def fetch_user_wikis(
 
             if activity.editcount != editcount:
                 lang = url.split("//")[-1].split(".")[0]
-                wiki_site = pywikibot.Site(lang, "wikipedia")
+#                wiki_site = pywikibot.Site(lang, "wikipedia")
+                wiki_site=pywikibot.site.APISite.fromDBName(wiki_db)
                 user = pywikibot.User(wiki_site, name)
                 last_edit = next(user.contributions(total=1), None)
                 if last_edit:

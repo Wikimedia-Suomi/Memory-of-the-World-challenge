@@ -57,6 +57,7 @@ class Command(BaseCommand):
         if options["wikis"]:
             wiki_map = fetch_user_wikis(site, usernames)
             lines = [f"{user}: {', '.join(wiki_map[user])}" for user in usernames]
+            print("--")
 
             if options["unesco"]:
                 all_wikis = sorted({w for wikis in wiki_map.values() for w in wikis})
