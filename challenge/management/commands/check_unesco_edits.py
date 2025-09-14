@@ -115,6 +115,8 @@ class Command(BaseCommand):
                                     for claim in item.claims.get("P31", [])
                                 ):
                                     points = 25
+                                    action_desc = f"created list article {link} with UNESCO link in it"
+
                             except Exception:
                                 pass
 
