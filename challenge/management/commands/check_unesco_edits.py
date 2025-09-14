@@ -32,7 +32,7 @@ class Command(BaseCommand):
         if since.tzinfo is None:
             since = since.replace(tzinfo=timezone.utc)
 
-        since_ts = pywikibot.Timestamp.fromdatetime(since)
+        since_ts = pywikibot.Timestamp.set_timestamp(since)
 
         participants = Participant.objects.all()
         for participant in participants:
