@@ -8,7 +8,7 @@ from django.core.management.base import BaseCommand
 
 from challenge.models import Participant
 
-UNESCO_PATTERN = re.compile(r"https://www\.unesco\.org/(?:[a-z]{2}/)?memory-world/")
+UNESCO_PATTERN = re.compile(r"https://(www\.)?unesco\.org/(?:[a-z]{2}/)?memory-world/")
 SKIP_TAGS = {"mw-reverted", "mw-manual-revert", "mw-undo", "mw-rollback"}
 
 
@@ -41,7 +41,6 @@ class Command(BaseCommand):
             for activity in activities:
                 site = pywikibot.site.APISite.fromDBName(activity.wiki)
                 ucgen = site.usercontribs(user=participant.username, end=since_ts)
-                ucgen.request["ucprop"] += "|tags"
                 for contrib in ucgen:
                     timestamp = datetime.fromisoformat(contrib['timestamp'].replace("Z", "+00:00"))
                     if timestamp.tzinfo is None:
@@ -50,12 +49,20 @@ class Command(BaseCommand):
                     if timestamp < since:
                         break
 
-                    if SKIP_TAGS & set(contrib.get("tags", [])):
-                        continue
-
                     page_obj = pywikibot.Page(site, contrib["title"])
                     revid = contrib["revid"]
                     revision = page_obj.get_revision(revid, content=True)
+                    if SKIP_TAGS & set(revision.tags):
+
+                        self.stdout.write(
+                            f"SKIPPED:{revision.tags} : "
+                            f"{participant.username} on {activity.wiki} added UNESCO link in "
+                            f"[[{page_obj.title()}]] (rev {revid})"
+                        )
+
+
+                        continue
+
                     parentid = revision.parentid
                     new_text = revision.text or ""
                     old_text = page_obj.getOldVersion(parentid) if parentid else ""
