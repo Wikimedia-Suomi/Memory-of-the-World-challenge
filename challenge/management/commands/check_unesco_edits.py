@@ -188,8 +188,9 @@ class Command(BaseCommand):
                         points_by_user[participant.username] += points
 
         if points_by_user:
-            for user in sorted(points_by_user):
-                pts = points_by_user[user]
+            for user, pts in sorted(
+                points_by_user.items(), key=lambda item: item[1], reverse=True
+            ):
                 self.stdout.write(
                     f"== [[USER:{user}|{user}]] (points: {pts}) =="
                 )
