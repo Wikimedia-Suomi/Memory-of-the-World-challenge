@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import json
 from datetime import datetime, timezone
 from collections import defaultdict
 
@@ -17,8 +18,7 @@ SPARQL_QUERY = (
     "SELECT DISTINCT ?item WHERE { ?item p:P1435 ?s. ?s ps:P1435 wd:Q16024238."
     " ?s prov:wasDerivedFrom/pr:P854 ?refurl. ?s pq:P580 ?date. }"
 )
-#LABEL_EDIT_RE = re.compile(r"/\\*wbsetlabel[^*]*:(\d+)\\|")
-LABEL_EDIT_RE = re.compile(r"(?:wbsetlabel|wbeditentity-update-languages)")
+# No longer relying on edit comments for label counts
 
 def fetch_unesco_items() -> set[str]:
     """Fetch Wikidata items related to UNESCO Memory of the World."""
@@ -111,12 +111,22 @@ class Command(BaseCommand):
                         print(comment)
 
                         if title in items and ("wbsetlabel" in comment or "wbeditentity-update-languages" in comment):
-                            match = LABEL_EDIT_RE.search(comment)
-                            num_labels = 0 if match else 1
+                            parentid = revision.parentid
+                            new_text = revision.text or "{}"
+                            old_text = page_obj.getOldVersion(parentid) if parentid else "{}"
+                            try:
+                                new_labels = json.loads(new_text).get("labels", {})
+                                old_labels = json.loads(old_text).get("labels", {})
+                            except Exception:
+                                continue
+                            added_languages = [lang for lang in new_labels if lang not in old_labels]
+                            num_labels = len(added_languages)
+                            if num_labels == 0:
+                                continue
                             item_link = f"[[:d:{title}]]"
                             rev_link = f"[[:d:Special:Diff/{revid}|{revid}]]"
                             actions_by_user[participant.username].append(
-                                f"* +1 points, on {activity.wiki} edited label(s) of {item_link} (rev {rev_link})"
+                                f"* +{num_labels} points, on {activity.wiki} added label(s) of {item_link} (rev {rev_link})",
                             )
                             points_by_user[participant.username] += num_labels
                         continue
