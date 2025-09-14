@@ -51,7 +51,7 @@ def fetch_user_wikis(
     """Return a mapping of username to Wikipedia projects they have edited."""
     result: Dict[str, List[str]] = {}
     for name in usernames:
-        request = site._simple_request(
+        request = site.simple_request(
             action="query",
             meta="globaluserinfo",
             guiuser=name,
