@@ -11,6 +11,22 @@ from challenge.models import Participant
 UNESCO_PATTERN = re.compile(r"https://(www\.)?unesco\.org/(?:[a-z]{2}/)?memory-world/")
 SKIP_TAGS = {"mw-reverted", "mw-manual-revert", "mw-undo", "mw-rollback"}
 
+def get_creator(page: pywikibot.Page):
+    threshold_date = datetime(2025, 9, 1, 0, 0, 0, tzinfo=timezone.utc)
+    try:
+        oldest_revision = page.oldest_revision
+        creator = oldest_revision.user
+        creation_time = oldest_revision.timestamp
+        if creation_time.tzinfo is None:
+            creation_time = creation_time.replace(tzinfo=timezone.utc)
+
+#        print(f"Page creator: {creator}")
+#        print(f"Created on: {creation_time}")
+        if creation_time > threshold_date:
+            return creator;
+    except Exception as e:
+        print(f"Error: {e}")
+    return ""
 
 class Command(BaseCommand):
     """Check participant edits adding UNESCO Memory of the World links."""
@@ -59,8 +75,6 @@ class Command(BaseCommand):
                             f"{participant.username} on {activity.wiki} added UNESCO link in "
                             f"[[{page_obj.title()}]] (rev {revid})"
                         )
-
-
                         continue
 
                     parentid = revision.parentid
@@ -70,8 +84,9 @@ class Command(BaseCommand):
                     if UNESCO_PATTERN.search(new_text) and not UNESCO_PATTERN.search(
                         old_text
                     ):
+                        creator = get_creator(page_obj)
                         self.stdout.write(
                             f"{participant.username} on {activity.wiki} added UNESCO link in "
-                            f"[[{page_obj.title()}]] (rev {revid})"
+                            f"[[{page_obj.title()}]] (rev {revid}) {creator}"
                         )
 
