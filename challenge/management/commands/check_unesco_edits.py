@@ -5,12 +5,26 @@ from datetime import datetime, timezone
 from collections import defaultdict
 
 import pywikibot
+from pywikibot.data import sparql
 from django.core.management.base import BaseCommand
 
 from challenge.models import Participant
 
 UNESCO_PATTERN = re.compile(r"https://(www\.)?unesco\.org/(?:[a-z]{2}/)?memory-world/")
 SKIP_TAGS = {"mw-reverted", "mw-manual-revert", "mw-undo", "mw-rollback"}
+
+SPARQL_QUERY = (
+    "SELECT DISTINCT ?item WHERE { ?item p:P1435 ?s. ?s ps:P1435 wd:Q16024238."
+    " ?s prov:wasDerivedFrom/pr:P854 ?refurl. ?s pq:P580 ?date. }"
+)
+LABEL_EDIT_RE = re.compile(r"/\\*wbsetlabel[^*]*:(\d+)\\|")
+
+
+def fetch_unesco_items() -> set[str]:
+    """Fetch Wikidata items related to UNESCO Memory of the World."""
+    endpoint = sparql.SparqlQuery()
+    data = endpoint.select(SPARQL_QUERY)
+    return {row["item"].split("/")[-1] for row in data}
 
 def get_creator(page: pywikibot.Page):
     threshold_date = datetime(2025, 9, 1, 0, 0, 0, tzinfo=timezone.utc)
@@ -45,12 +59,12 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options) -> None:  # pragma: no cover - side effects
-        since = datetime.fromisoformat(options["since"].replace("Z", "+00:00"))
-        if since.tzinfo is None:
-            since = since.replace(tzinfo=timezone.utc)
+        items = fetch_unesco_items()
 
-        since_ts = pywikibot.Timestamp.set_timestamp(since)
-
+        start = datetime(2025, 9, 1, 0, 0, 0, tzinfo=timezone.utc)
+        end = datetime(2025, 9, 30, 23, 59, 59, tzinfo=timezone.utc)
+        start_ts = pywikibot.Timestamp.set_timestamp(start)
+        end_ts = pywikibot.Timestamp.set_timestamp(end)
 
         participants = Participant.objects.all()
         points_by_user: defaultdict[str, int] = defaultdict(int)
@@ -61,7 +75,9 @@ class Command(BaseCommand):
             activities = participant.activities.filter(active=True)
             for activity in activities:
                 site = pywikibot.site.APISite.fromDBName(activity.wiki)
-                ucgen = site.usercontribs(user=participant.username, end=since_ts)
+                ucgen = site.usercontribs(
+                    user=participant.username, start=end_ts, end=start_ts
+                )
                 for contrib in ucgen:
                     timestamp = datetime.fromisoformat(
                         contrib["timestamp"].replace("Z", "+00:00")
@@ -69,11 +85,28 @@ class Command(BaseCommand):
                     if timestamp.tzinfo is None:
                         timestamp = timestamp.replace(tzinfo=timezone.utc)
 
-                    if timestamp < since:
+                    if timestamp < start:
                         break
+                    if timestamp > end:
+                        continue
+
+                    revid = contrib["revid"]
+
+                    if activity.wiki == "wikidatawiki":
+                        title = contrib["title"]
+                        comment = contrib.get("comment", "")
+                        if title in items and "wbsetlabel" in comment:
+                            match = LABEL_EDIT_RE.search(comment)
+                            num_labels = int(match.group(1)) if match else 1
+                            item_link = f"[[:d:{title}]]"
+                            rev_link = f"[[:d:Special:Diff/{revid}|{revid}]]"
+                            actions_by_user[participant.username].append(
+                                f"* +{num_labels} points, on {activity.wiki} edited label(s) of {item_link} (rev {rev_link})"
+                            )
+                            points_by_user[participant.username] += num_labels
+                        continue
 
                     page_obj = pywikibot.Page(site, contrib["title"])
-                    revid = contrib["revid"]
                     prefix = activity.wiki.replace("wiki", "")
                     link = f"[[:{prefix}:{page_obj.title()}]]"
                     rev_link = f"[[:{prefix}:Special:Diff/{revid}|{revid}]]"
