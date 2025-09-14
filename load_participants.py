@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Iterable, List, Set
+from typing import Dict, Iterable, List, Set
 
 import pywikibot
 
@@ -36,13 +36,31 @@ def extract_usernames(page: pywikibot.Page) -> List[str]:
     return sorted(usernames)
 
 
-def write_output(usernames: Iterable[str], output: Path | None) -> None:
-    """Write *usernames* either to stdout or to *output* file."""
+def write_output(lines: Iterable[str], output: Path | None) -> None:
+    """Write *lines* either to stdout or to *output* file."""
     if output is None:
-        for name in usernames:
-            print(name)
+        for line in lines:
+            print(line)
     else:
-        output.write_text("\n".join(usernames) + "\n", encoding="utf-8")
+        output.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def fetch_user_wikis(
+    site: pywikibot.Site, usernames: Iterable[str]
+) -> Dict[str, List[str]]:
+    """Return a mapping of username to wiki codes they have edited."""
+    result: Dict[str, List[str]] = {}
+    for name in usernames:
+        request = site._simple_request(
+            action="query",
+            meta="globaluserinfo",
+            guiuser=name,
+            guiprop="merged",
+        )
+        data = request.submit()
+        wikis = [m["wiki"] for m in data["query"]["globaluserinfo"].get("merged", [])]
+        result[name] = wikis
+    return result
 
 
 def main() -> int:
@@ -62,6 +80,11 @@ def main() -> int:
         default="Memory_of_the_World_challenge_2025/Participants",
         help="title of the participants page",
     )
+    parser.add_argument(
+        "--wikis",
+        action="store_true",
+        help="also fetch the wikis each user has edited",
+    )
     args = parser.parse_args()
 
     site = pywikibot.Site("meta", "meta")
@@ -79,7 +102,12 @@ def main() -> int:
             return 1
         raise
 
-    write_output(usernames, args.output)
+    if args.wikis:
+        wiki_map = fetch_user_wikis(site, usernames)
+        lines = [f"{user}: {', '.join(wiki_map[user])}" for user in usernames]
+        write_output(lines, args.output)
+    else:
+        write_output(usernames, args.output)
     return 0
 
 
