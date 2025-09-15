@@ -46,6 +46,7 @@ def get_creator(page: pywikibot.Page):
         print(f"Error: {e}")
     return ""
 
+
 class Command(BaseCommand):
     """Check participant edits adding UNESCO Memory of the World links."""
 
@@ -59,6 +60,12 @@ class Command(BaseCommand):
             "--since",
             default="2025-09-01T00:00:00Z",
             help="ISO timestamp (UTC) of earliest edit to inspect",
+        )
+
+        parser.add_argument(
+            "--dry-run",
+            action="store_true",
+            help="Do not write the results to metawiki.",
         )
 
     def handle(self, *args, **options) -> None:  # pragma: no cover - side effects
@@ -187,12 +194,74 @@ class Command(BaseCommand):
                         )
                         points_by_user[participant.username] += points
 
+       # Write results to Meta-wiki page
         if points_by_user:
+            # Build the content for the Meta-wiki page
+            page_content = []
+            page_content.append("= UNESCO Memory of the World Challenge Leaderboard =\n")
+            page_content.append(f"Last updated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}\n")
+            page_content.append("")
+            
             for user, pts in sorted(
                 points_by_user.items(), key=lambda item: item[1], reverse=True
             ):
-                self.stdout.write(
-                    f"== [[USER:{user}|{user}]] (points: {pts}) =="
-                )
+                page_content.append(f"== [[USER:{user}|{user}]] (points: {pts}) ==")
                 for line in actions_by_user[user]:
-                    self.stdout.write(line)
+                    page_content.append(line)
+                page_content.append("")  # Add empty line between users
+            
+            # Join all content
+            wiki_text = "\n".join(page_content)
+            
+            # Check if this is a dry run
+            dry_run = options.get('dry_run', False)
+          
+            
+            if dry_run:
+                self.stdout.write("=== DRY RUN: Content that would be written to Meta-wiki ===")
+                self.stdout.write(f"Page: User:Zache/leaderboard")
+                self.stdout.write(f"Edit summary: Updating UNESCO Memory of the World Challenge leaderboard")
+                self.stdout.write("--- PAGE CONTENT START ---")
+                self.stdout.write(wiki_text)
+                self.stdout.write("--- PAGE CONTENT END ---")
+                self.stdout.write("=== DRY RUN COMPLETE (no changes made) ===")
+            else:
+                # Create the Meta-wiki page object
+                leaderboard_page = pywikibot.Page(metasite, "User:Zache/leaderboard")
+                
+                # Save the page
+                try:
+                    leaderboard_page.text = wiki_text
+                    leaderboard_page.save(
+                        summary="Updating UNESCO Memory of the World Challenge leaderboard",
+                        minor=False,
+                        botflag=True
+                    )
+                    self.stdout.write(f"Successfully updated leaderboard page: {leaderboard_page.title()}")
+                    
+                    # Also print to console for debugging
+                    self.stdout.write("\n=== Content written to Meta-wiki ===")
+                    for user, pts in sorted(
+                        points_by_user.items(), key=lambda item: item[1], reverse=True
+                    ):
+                        self.stdout.write(f"== [[USER:{user}|{user}]] (points: {pts}) ==")
+                        for line in actions_by_user[user]:
+                            self.stdout.write(line)
+                            
+                except Exception as e:
+                    self.stdout.write(f"Error updating Meta-wiki page: {e}")
+                    # Fall back to console output
+                    self.stdout.write("\n=== Fallback to console output ===")
+                    for user, pts in sorted(
+                        points_by_user.items(), key=lambda item: item[1], reverse=True
+                    ):
+                        self.stdout.write(f"== [[USER:{user}|{user}]] (points: {pts}) ==")
+                        for line in actions_by_user[user]:
+                            self.stdout.write(line)
+        else:
+            dry_run = options.get('dry_run', False)
+            if dry_run:
+                self.stdout.write("=== DRY RUN: No points found for any participants (no page would be created) ===")
+            else:
+                self.stdout.write("No points found for any participants.")
+
