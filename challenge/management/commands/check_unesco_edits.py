@@ -138,7 +138,7 @@ class Command(BaseCommand):
                             rev_link = f"[[:d:Special:Diff/{revid}|{revid}]]"
                             lang_links = result = ", ".join([f"{{{{{added_lang}}}}}" for added_lang in added_languages])
                             actions_by_user[participant.username].append(
-                                f"* +{num_labels} points, on {activity.wiki} added label(s) ({lang_links}) to {item_link} (rev {rev_link})",
+                                f"* +{num_labels} points, on {activity.wiki} added label(s) {lang_links} to {item_link} (rev {rev_link})",
                             )
                             points_by_user[participant.username] += num_labels
                         continue
@@ -198,18 +198,21 @@ class Command(BaseCommand):
         if points_by_user:
             # Build the content for the Meta-wiki page
             page_content = []
-            page_content.append("= UNESCO Memory of the World Challenge Leaderboard =\n")
+            page_content.append("This is an unofficial UNESCO Memory of the World Challenge results list updated by a bot. Please check the results and also update them manually on the [[Memory of the World challenge 2025/Participants|Participants]] page. ")
             page_content.append(f"Last updated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}\n")
-            page_content.append("")
+            page_content.append("Detailed point calculation rules are at the end of the page. Please notify on the talk page if there are missing points so the code can be fixed.")
+            page_content.append("== Results ==")
             
             for user, pts in sorted(
                 points_by_user.items(), key=lambda item: item[1], reverse=True
             ):
-                page_content.append(f"== [[USER:{user}|{user}]] (points: {pts}) ==")
+                page_content.append(f"=== [[USER:{user}|{user}]] (points: {pts}) ===")
                 for line in actions_by_user[user]:
                     page_content.append(line)
                 page_content.append("")  # Add empty line between users
             
+            page_content.append("{{/Info}}")
+
             # Join all content
             wiki_text = "\n".join(page_content)
             
@@ -219,21 +222,21 @@ class Command(BaseCommand):
             
             if dry_run:
                 self.stdout.write("=== DRY RUN: Content that would be written to Meta-wiki ===")
-                self.stdout.write(f"Page: User:Zache/leaderboard")
-                self.stdout.write(f"Edit summary: Updating UNESCO Memory of the World Challenge leaderboard")
+                self.stdout.write(f"Page: Memory of the World challenge 2025/Participants/Results")
+                self.stdout.write(f"Edit summary: Updating UNESCO Memory of the World Challenge results")
                 self.stdout.write("--- PAGE CONTENT START ---")
                 self.stdout.write(wiki_text)
                 self.stdout.write("--- PAGE CONTENT END ---")
                 self.stdout.write("=== DRY RUN COMPLETE (no changes made) ===")
             else:
                 # Create the Meta-wiki page object
-                leaderboard_page = pywikibot.Page(metasite, "User:Zache/leaderboard")
+                leaderboard_page = pywikibot.Page(metasite, "Memory of the World challenge 2025/Participants/Results")
                 
                 # Save the page
                 try:
                     leaderboard_page.text = wiki_text
                     leaderboard_page.save(
-                        summary="Updating UNESCO Memory of the World Challenge leaderboard",
+                        summary="Updating unofficial UNESCO Memory of the World Challenge results",
                         minor=False,
                         botflag=True
                     )
