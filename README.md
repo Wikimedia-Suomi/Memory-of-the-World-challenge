@@ -35,6 +35,9 @@ pip install -r requirements.txt
 python manage.py migrate
 ```
 
+Create a `user-config.py` file so Pywikibot can log in to the Wikimedia
+projects.
+
 ## Utilities
 
 The `load_participants` management command uses
@@ -59,3 +62,19 @@ python manage.py load_participants --wikis --unesco
 ```
 
 Use the `--login` option if the page requires authentication.
+
+## Updating statistics
+
+To refresh the set of participant wikis and publish updated statistics:
+
+```bash
+python manage.py load_participants --wikis
+python manage.py check_unesco_edits
+```
+
+Run `check_unesco_edits` with `--dry-run` to display the results locally
+without writing them to the wiki:
+
+```bash
+python manage.py check_unesco_edits --dry-run
+```
