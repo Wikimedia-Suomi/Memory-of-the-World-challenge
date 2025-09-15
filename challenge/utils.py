@@ -57,7 +57,7 @@ def fetch_user_wikis(
     whether the wiki is active are stored in the database.
     """
 
-    cutoff = datetime.now(timezone.utc) - timedelta(days=33)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=66)
     result: Dict[str, List[str]] = {}
     for name in usernames:
         request = site.simple_request(
@@ -116,14 +116,14 @@ def fetch_unesco_pages(wikis: Iterable[str]) -> Dict[str, List[str]]:
     of pages that contain links whose URL includes ``memory-world`` either
     directly or with a language code such as ``/en/memory-world``.  Pages
     are only included if their most recent edit occurred within the last
-    33 days.  The returned mapping uses the wiki database name as the key
+    66 days.  The returned mapping uses the wiki database name as the key
     and a sorted list of page titles as the value.
     """
 
     # UNESCO publishes the Memory of the World site in these languages
     languages = ["", "ar", "en", "es", "fr", "ru", "zh"]
 
-    cutoff = datetime.now(timezone.utc) - timedelta(days=33)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=66)
     result: Dict[str, List[str]] = {}
     for wiki in wikis:
         wiki_site = pywikibot.site.APISite.fromDBName(wiki)
