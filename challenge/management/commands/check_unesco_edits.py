@@ -30,7 +30,7 @@ def fetch_unesco_items() -> set[str]:
     return {row["item"].split("/")[-1] for row in data}
 
 def get_creator(page: pywikibot.Page):
-    threshold_date = datetime(2025, 9, 1, 0, 0, 0, tzinfo=timezone.utc)
+    threshold_date = datetime(2025, 8, 1, 0, 0, 0, tzinfo=timezone.utc)
     try:
         oldest_revision = page.oldest_revision
         creator = oldest_revision.user
@@ -58,7 +58,7 @@ class Command(BaseCommand):
     def add_arguments(self, parser) -> None:  # pragma: no cover - argparse boilerplate
         parser.add_argument(
             "--since",
-            default="2025-09-01T00:00:00Z",
+            default="2025-08-01T00:00:00Z",
             help="ISO timestamp (UTC) of earliest edit to inspect",
         )
 
@@ -71,8 +71,8 @@ class Command(BaseCommand):
     def handle(self, *args, **options) -> None:  # pragma: no cover - side effects
         items = fetch_unesco_items()
 
-        start = datetime(2025, 9, 1, 0, 0, 0, tzinfo=timezone.utc)
-        end = datetime(2025, 9, 30, 23, 59, 59, tzinfo=timezone.utc)
+        start = datetime(2025, 8, 1, 0, 0, 0, tzinfo=timezone.utc)
+        end = datetime(2025, 10, 1, 23, 59, 59, tzinfo=timezone.utc)
         start_ts = pywikibot.Timestamp.set_timestamp(start)
         end_ts = pywikibot.Timestamp.set_timestamp(end)
 
@@ -82,7 +82,7 @@ class Command(BaseCommand):
         pages_seen: defaultdict[str, set[tuple[str, str]]] = defaultdict(set)
 
         for participant in participants:
-#            if participant.username != "Umar2z":
+#            if participant.username != "DrThneed":
 #                continue
             activities = participant.activities.filter(active=True)
             for activity in activities:
@@ -144,14 +144,6 @@ class Command(BaseCommand):
                         continue
 
                     revision = page_obj.get_revision(revid, content=True)
-                    if SKIP_TAGS & set(revision.tags):
-                        self.stdout.write(
-                            f"SKIPPED:{revision.tags} : "
-                            f"{participant.username} on {activity.wiki} added UNESCO link in "
-                            f"{link} (rev {rev_link})"
-                        )
-                        continue
-
                     prefix = activity.wiki.replace("wiki", "")
                     link = f"[[:{prefix}:{page_obj.title()}]]"
                     rev_link = f"[[:{prefix}:Special:Diff/{revid}|{revid}]]"
@@ -163,6 +155,16 @@ class Command(BaseCommand):
                     if UNESCO_PATTERN.search(new_text) and not UNESCO_PATTERN.search(
                         old_text
                     ):
+
+                        if SKIP_TAGS & set(revision.tags):
+                            self.stdout.write(
+                                f"SKIPPED:{revision.tags} : "
+                                f"{participant.username} on {activity.wiki} added UNESCO link in "
+                                f"{link} (rev {rev_link})"
+                            )
+                            continue
+
+
                         page_key = (activity.wiki, page_obj.title())
                         if page_key in pages_seen[participant.username]:
                             continue
@@ -198,10 +200,11 @@ class Command(BaseCommand):
         if points_by_user:
             # Build the content for the Meta-wiki page
             page_content = []
-            page_content.append("This is an unofficial UNESCO Memory of the World Challenge results list updated by a bot. Please check the results and also update them manually on the [[Memory of the World challenge 2025/Participants|Participants]] page. ")
-            page_content.append(f"Last updated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}\n")
-            page_content.append("Detailed point calculation rules are at the end of the page. Please notify on the talk page if there are missing points so the code can be fixed.")
+#            page_content.append("This is an unofficial UNESCO Memory of the World Challenge results list updated by a bot. Please check the results and also update them manually on the [[Memory of the World challenge 2025/Participants|Participants]] page. ")
+#            page_content.append("Detailed point calculation rules are at the end of the page. Please notify on the talk page if there are missing points so the code can be fixed.")
+            page_content.append("{{/Header}}")
             page_content.append("== Results ==")
+            page_content.append(f"Last updated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}\n")
             
             for user, pts in sorted(
                 points_by_user.items(), key=lambda item: item[1], reverse=True
@@ -236,7 +239,7 @@ class Command(BaseCommand):
                 try:
                     leaderboard_page.text = wiki_text
                     leaderboard_page.save(
-                        summary="Updating unofficial UNESCO Memory of the World Challenge results",
+                        summary="Updating UNESCO Memory of the World Challenge results",
                         minor=False,
                         botflag=True
                     )
