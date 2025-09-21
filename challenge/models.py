@@ -13,6 +13,7 @@ class WikiActivity(models.Model):
     active = models.BooleanField(default=False)
     rev_count = models.IntegerField(default=0)
     ar_count = models.IntegerField(default=0)
+    points = models.IntegerField(default=0)
 
     class Meta:
         unique_together = ("participant", "wiki")
